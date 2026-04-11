@@ -1,0 +1,61 @@
+# Forge Protocol — Gate 5: Deploy Gate (Review Enforcement)
+#
+# Blocks deploys if weekly review or monthly audit is overdue.
+# Add this as a required check on your main branch.
+#
+# Copy to: .github/workflows/forge-deploy-gate.yml
+# Then: Settings → Branches → main → Require status checks → "Forge Deploy Gate"
+
+name: Forge Deploy Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check-reviews:
+    name: Forge Deploy Gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check weekly review freshness
+        run: |
+          REVIEW_FILE=".forge/weekly-review.txt"
+          if [ ! -f "$REVIEW_FILE" ]; then
+            echo "::warning::No weekly review artifact found. First run? Skipping check."
+            exit 0
+          fi
+
+          REVIEW_DATE=$(grep FORGE_WEEKLY_REVIEW "$REVIEW_FILE" | cut -d= -f2)
+          REVIEW_EPOCH=$(date -d "$REVIEW_DATE" +%s 2>/dev/null || date -j -f "%Y-%m-%d" "$REVIEW_DATE" +%s)
+          NOW_EPOCH=$(date +%s)
+          DAYS_AGO=$(( (NOW_EPOCH - REVIEW_EPOCH) / 86400 ))
+
+          if [ "$DAYS_AGO" -gt 14 ]; then
+            echo "::error::Forge Protocol: Weekly review is ${DAYS_AGO} days old (max 14). Complete the review before deploying."
+            echo "Run the weekly review workflow manually or complete the open review issue."
+            exit 1
+          fi
+          echo "Weekly review is ${DAYS_AGO} days old. OK."
+
+      - name: Check monthly audit freshness
+        run: |
+          AUDIT_FILE=".forge/monthly-audit.txt"
+          if [ ! -f "$AUDIT_FILE" ]; then
+            echo "::warning::No monthly audit artifact found. First run? Skipping check."
+            exit 0
+          fi
+
+          AUDIT_DATE=$(grep FORGE_MONTHLY_AUDIT "$AUDIT_FILE" | cut -d= -f2)
+          AUDIT_EPOCH=$(date -d "$AUDIT_DATE" +%s 2>/dev/null || date -j -f "%Y-%m-%d" "$AUDIT_DATE" +%s)
+          NOW_EPOCH=$(date +%s)
+          DAYS_AGO=$(( (NOW_EPOCH - AUDIT_EPOCH) / 86400 ))
+
+          if [ "$DAYS_AGO" -gt 35 ]; then
+            echo "::error::Forge Protocol: Monthly audit is ${DAYS_AGO} days old (max 35). Complete the audit before deploying."
+            exit 1
+          fi
+          echo "Monthly audit is ${DAYS_AGO} days old. OK."

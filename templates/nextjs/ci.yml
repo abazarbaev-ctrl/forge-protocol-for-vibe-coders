@@ -1,0 +1,60 @@
+# Forge Protocol — CI/CD Pipeline Template (Next.js 14)
+# Source: Zeen AI Tutor (5/5 quality)
+#
+# Single pipeline: install -> prisma generate -> lint -> test -> build
+# Copy to: .github/workflows/ci.yml
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Uncomment if using Prisma:
+      # - name: Generate Prisma client
+      #   run: npx prisma generate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+  # -- Security Scanning --
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Secret scanning (GitLeaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Dependency scanning
+        run: |
+          npm ci
+          npm audit --audit-level=high || true  # Warn but don't block

@@ -1,0 +1,46 @@
+# Forge Protocol — Docker Compose Template (FastAPI)
+# Source: iiko-assistant (production patterns)
+#
+# Local dev with hot reload + Redis + PostgreSQL
+# Copy to project root, adapt service names and ports.
+
+version: "3.9"
+
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:password@db:5432/app
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./app:/app/app  # Hot reload in dev
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: app
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  pg_data:
+  redis_data:

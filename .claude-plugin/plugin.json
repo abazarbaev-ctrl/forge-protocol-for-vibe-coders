@@ -1,0 +1,13 @@
+{
+  "name": "forge-protocol",
+  "version": "1.4.0",
+  "description": "Forge Protocol — 6-gate quality methodology for vibe coders. Automatically applies adversarial spec review, code review, testing, and deploy checks.",
+  "author": {
+    "name": "Almaz Bazarbaev"
+  },
+  "repository": "https://github.com/abazarbaev-ctrl/forge-protocol-for-vibe-coders",
+  "license": "MIT",
+  "keywords": ["forge", "protocol", "vibe-coding", "code-quality", "adversarial-testing", "production-ready"],
+  "skills": "./skills/",
+  "hooks": "./hooks/hooks.json"
+}
