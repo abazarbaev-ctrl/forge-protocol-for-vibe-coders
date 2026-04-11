@@ -1,97 +1,123 @@
 ---
 name: forge-fix
-description: Apply the top fix from /forge-scan — one fix at a time, one commit per fix
-tools: [Bash, Read, Write, Edit, Grep, Glob]
+description: Execute the fix plan from /forge-scan — plans all fixes upfront, tracks progress with todo list, doesn't lose context when interrupted
+tools: [Bash, Read, Write, Edit, Grep, Glob, Agent, TodoWrite]
 ---
 
-# Forge Fix — Apply One Fix at a Time
+# Forge Fix — Execute Fix Plan
 
-Apply the highest-impact fix identified by `/forge-scan`. Each run fixes ONE thing and commits it.
+Apply fixes identified by `/forge-scan`. Plans ALL fixes upfront, tracks them with a todo list, and works through them in priority order.
 
 ## Usage
 
-`/forge-fix` — apply the next highest-priority fix
-`/forge-fix [specific fix]` — apply a specific fix (e.g., `/forge-fix add health check`)
+`/forge-fix` — execute the fix plan (run /forge-scan first if no plan exists)
+`/forge-fix [specific fix]` — jump to a specific fix
+
+## CRITICAL RULE: Plan First, Then Execute
+
+**Step 1: Check if /forge-scan was run this session.**
+- If not, run /forge-scan first to get the fix plan.
+
+**Step 2: Create a todo list with ALL fixes from the scan.**
+Use TodoWrite to create the full plan. Example:
+```
+1. [pending] Fix: Add auth to 6 unprotected routes
+2. [pending] Fix: Add input validation to 4 POST endpoints
+3. [pending] Fix: Upgrade health check to verify DB/Redis
+4. [pending] Fix: Add adversarial tests for auth bypass
+5. [pending] Fix: Update 2 vulnerable dependencies
+```
+
+**Step 3: Work through fixes in order.**
+- Mark current fix as `in_progress`
+- Apply it
+- Commit it
+- Mark as `completed`
+- Move to next fix
+
+**Step 4: If the user asks an unrelated question — answer it, then come back.**
+The todo list persists. After answering, say: "Back to forge-fix — we have X fixes remaining. Continuing with [next fix]?"
 
 ## Priority Order
 
-Always fix in this order (critical safety issues first):
+Always fix in this order:
 
-1. **CRITICAL: Secrets in code** — move to .env, add .env to .gitignore
-2. **CRITICAL: .env not in .gitignore** — add it immediately
-3. **Error handling** — add global error handler from templates
-4. **Health check** — add /health endpoint from templates
-5. **CI pipeline** — add GitHub Actions workflow from templates
-6. **Structured logging** — add from templates
-7. **Tests** — create test directory and initial test file
-8. **Input validation** — add Pydantic/Zod models for existing endpoints
-9. **Auth middleware** — add from templates (needs user input on auth provider)
-10. **Rate limiting** — add from templates
+### Priority 1: CRITICAL (do these immediately)
+1. **Secrets in code** — move to .env, update code to use env vars
+   - WARN: "These were in git history. If repo is public, rotate keys NOW."
+2. **.env not protected** — add to .gitignore, check if tracked
+3. **Critical dependency vulnerabilities** — update packages
+
+### Priority 2: ERROR VISIBILITY (safety net)
+4. **Error handling** — add/upgrade global exception handler
+   - Read the main app file, understand the framework
+   - Don't just drop in a template — adapt it to existing code structure
+   - Wire it properly (middleware registration, error boundary wrapping)
+5. **Health check** — add or upgrade to deep health check
+   - Check what dependencies exist (DB? Redis? External APIs?)
+   - Health check should verify each one
+6. **Structured logging** — add or upgrade
+   - Replace print() statements with proper logging
+   - Add request_id propagation if middleware exists
+
+### Priority 3: SECURITY (hardening)
+7. **Auth on unprotected routes** — ASK the user first
+   - Show the list of unprotected routes
+   - Ask: "Which of these should require auth? Any intentionally public?"
+   - Don't blindly protect everything — some routes ARE public
+8. **Input validation** — add to unvalidated endpoints
+   - Read each endpoint, understand what it accepts
+   - Create proper validation models (Pydantic/Zod) matching actual usage
+   - Don't over-constrain — read existing code to understand valid inputs
+9. **Rate limiting** — add to expensive endpoints
+   - Identify: AI calls, auth endpoints, file uploads, webhooks
+   - Ask: "Default is 10/min for AI, 5/min for auth. Adjust?"
+10. **CORS** — restrict if wide open
+    - Ask: "What origins should be allowed?"
+
+### Priority 4: TESTING (verification)
+11. **Tests** — write meaningful tests, not boilerplate
+    - Read existing code to understand what the critical paths are
+    - Write tests that test REAL scenarios, not just "endpoint returns 200"
+    - Include at least 2 adversarial tests per critical endpoint
+    - Ask: "Want me to run them?"
+12. **CI improvements** — add missing stages
+
+### Priority 5: ARCHITECTURE (long-term)
+13. **Code duplication** — extract to shared modules
+14. **Project context file** — create or improve
 
 ## How to Apply Each Fix
 
-### Fix: Secrets in code
-1. Identify the hardcoded secrets
-2. Create or update `.env` with the secrets as environment variables
-3. Update code to use `os.environ.get()` or `process.env.`
-4. Add `.env` to `.gitignore` if not already there
-5. WARN the user: "These secrets are now in .env but they were already in git history. If this repo is public, rotate these keys immediately."
+**Read before writing.** Don't just drop templates in. Understand the existing code:
+- What framework? What patterns does the codebase already use?
+- What dependencies are already installed?
+- Where does the main app register middleware/routes?
 
-### Fix: .env not in .gitignore
-1. Add `.env` and `.env.*` to `.gitignore`
-2. That's it. One line, one commit.
+**Adapt, don't copy-paste.** Templates are starting points. The fix should match the project's existing style, naming conventions, and structure.
 
-### Fix: Error handling
-1. Detect framework: FastAPI (look for `from fastapi`), Next.js (look for `next.config`), Express (look for `express()`)
-2. Copy the matching template:
-   - FastAPI: adapt `templates/fastapi/error_middleware.py`
-   - Next.js: adapt `templates/nextjs/ErrorBoundary.tsx` + `templates/nextjs/GlobalErrorHandler.tsx`
-3. Wire it into the app's main file
-4. Adapt PLACEHOLDERs to match the project
+**One commit per fix.** Commit message format: `forge: [category] description`
+Examples:
+- `forge: [security] add auth middleware to 6 unprotected routes`
+- `forge: [error] upgrade health check to verify DB and Redis`
+- `forge: [test] add adversarial tests for order endpoint`
 
-### Fix: Health check
-1. Detect framework
-2. Copy and adapt `templates/fastapi/health_check.py` or equivalent
-3. Register the route in the main app file
+**After each fix, show progress:**
+```
+Fix 3/5 complete: Upgraded health check to verify DB + Redis
+Remaining:
+  4. Add adversarial tests for auth bypass
+  5. Update 2 vulnerable dependencies
 
-### Fix: CI pipeline
-1. Detect framework and package manager
-2. Copy matching template: `templates/fastapi/ci.yml` or `templates/nextjs/ci.yml`
-3. Place in `.github/workflows/ci.yml`
-4. Adapt: Python version, Node version, test commands
-
-### Fix: Structured logging
-1. Detect framework
-2. Copy and adapt `templates/fastapi/structured_logging.py` or `templates/nextjs/telemetry.ts`
-3. Wire into the app
-
-### Fix: Tests
-1. Create test directory (`tests/` for Python, `__tests__/` for JS)
-2. Create a conftest/setup file from templates
-3. Write 3-5 basic tests for existing routes/endpoints (health, main page, one API endpoint)
-4. Ask: "Tests written. Want me to run them?"
-
-### Fix: Input validation
-1. For Python: add Pydantic models for request bodies on existing POST/PUT endpoints
-2. For JS/TS: add Zod schemas for request validation
-3. Wire validation into route handlers
-
-### Fix: Auth middleware
-1. Ask the user: "Which auth provider? Firebase / Auth0 / Supabase / custom JWT?"
-2. Copy and adapt `templates/fastapi/auth_dependencies.py` or `templates/nextjs/middleware.ts`
-3. Wire into the app — but DON'T apply to all routes automatically
-4. Ask: "Which routes should require auth?"
-
-### Fix: Rate limiting
-1. Copy and adapt `templates/fastapi/rate_limiter.py`
-2. Apply to expensive endpoints (AI calls, auth, file upload)
-3. Ask: "Default is 10 requests/minute for AI endpoints. Adjust?"
+Quality score: 3/5 → 4/5 (projected after remaining fixes)
+Continue? (y/n)
+```
 
 ## Rules
 
-- **ONE fix per /forge-fix run.** Don't bundle.
-- **ONE commit per fix.** Clean git history.
-- **Ask before running tests** — user may not have dependencies installed.
-- **Ask before auth decisions** — don't guess the auth provider.
-- After applying, show updated score: "Quality score: 2/5 → 3/5. Run /forge-fix again for the next fix."
-- Templates are in the plugin directory at `${CLAUDE_PLUGIN_ROOT}/templates/` — read from there.
+- **Always ask before auth decisions** — don't guess what should be public vs protected
+- **Always ask before running tests** — user may not have dependencies installed
+- **If user asks unrelated question** — answer it, then offer to continue: "Want to continue with forge-fix? X fixes remaining."
+- **Don't bundle fixes** — one fix, one commit, one concern
+- **Update the todo list** after each fix so progress is visible
+- **If a fix fails or gets complicated** — stop, explain what went wrong, ask how to proceed. Don't hack around it.
