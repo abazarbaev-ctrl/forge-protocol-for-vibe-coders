@@ -163,8 +163,3 @@ Fix plan (priority order):
 
 Run /forge-fix to execute this plan.
 ```
-
-Badge:
-```
-![Forge Quality](https://img.shields.io/badge/forge_quality-3%2F5-yellow)
-```
