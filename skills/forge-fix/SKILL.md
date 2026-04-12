@@ -75,17 +75,62 @@ Always fix in this order:
 10. **CORS** — restrict if wide open
     - Ask: "What origins should be allowed?"
 
-### Priority 4: TESTING (verification)
-11. **Tests** — write meaningful tests, not boilerplate
+### Priority 4: LLM OPTIMIZATION (cost + reliability + migration)
+
+**CRITICAL RULE: Every LLM fix requires explicit user approval.** These changes affect model behavior and costs. Explain what you're doing and why before each change. No silent fixes.
+
+11. **Cost controls** — add safeguards to unprotected LLM calls
+   - For each LLM call without max_tokens: explain what it does, what a reasonable limit is, and why
+   - Add cost logging if none exists — show the user: "This logs token counts per call so you can see where money goes"
+   - ASK: "These X calls have no token limit. Here's what I'd set for each — adjust?"
+
+12. **Reliability** — add timeouts, retry, validation
+   - For each LLM call without timeout: "This call to [model] in [file] has no timeout. If the API hangs, your user waits forever. I'd add a 30s timeout — OK?"
+   - For calls without retry: "If this fails, it fails silently. I'd add retry with exponential backoff (3 attempts, 1s/2s/4s). OK?"
+   - For calls without response validation: "This passes the LLM response directly to [next step] without checking it. If the model returns empty or malformed output, [consequence]. I'd add validation — OK?"
+
+13. **Model tier optimization** — downgrade where possible
+   - For each call using an expensive model on a simple task:
+     - Show the user: "This uses [Opus/GPT-4] to [simple task]. Here's what the prompt does: [explain]. Haiku/GPT-4o-mini handles this — it's ~20x cheaper."
+     - Show a concrete cost comparison: "Currently ~$X/1K calls → ~$Y/1K calls"
+     - ASK: "Want me to switch this to [cheaper model]? We can always revert."
+   - NEVER downgrade without showing the user what the call does
+
+14. **Prompt efficiency** — reduce token waste
+   - For each bloated prompt: show the user the current prompt length vs what it could be
+   - If prompt caching isn't used: "Your system prompt is [X] tokens and sent every call. With prompt caching, repeat calls cost 90% less. Want me to add it?"
+   - ASK before changing any prompt — prompt changes affect output quality
+
+15. **Deterministic migration** — replace LLM calls with code
+   **This is the highest-impact, highest-risk fix. Full transparency required.**
+   For each migration candidate identified in the scan:
+   - **Explain the current behavior:** "This function calls [model] to [do X]. It receives [input type] and returns [output type]."
+   - **Show why it's a candidate:** "Looking at the code, this is doing [classification/extraction/formatting] which follows a predictable pattern. [Explain the pattern]."
+   - **Propose the replacement:** "I'd replace this with [rules engine / parser / lookup table / string template]. Here's what the code would look like: [show pseudocode]."
+   - **Explain the risks:** "If input doesn't match expected patterns, the deterministic version will [fail/return default]. The LLM would have handled this gracefully."
+   - **Propose the safe migration path:**
+     1. "First, I'll write the deterministic version alongside the LLM call"
+     2. "Add logging that compares both outputs (shadow mode)"
+     3. "After you verify agreement is high enough, we switch over"
+     4. "Keep the LLM call as fallback for edge cases"
+   - ASK: "Want me to proceed with this migration? We can start with shadow mode so nothing changes in production."
+   - ONE migration at a time. Never batch these.
+
+16. **Process leak safeguards** — prevent hanging LLM tasks
+   - For each background LLM task without timeout: "This async call to [model] in [file] could hang indefinitely, holding [resource]. I'd add a [timeout]s ceiling."
+   - ASK before adding — some background tasks are intentionally long-running
+
+### Priority 5: TESTING (verification)
+17. **Tests** — write meaningful tests, not boilerplate
     - Read existing code to understand what the critical paths are
     - Write tests that test REAL scenarios, not just "endpoint returns 200"
     - Include at least 2 adversarial tests per critical endpoint
     - Ask: "Want me to run them?"
-12. **CI improvements** — add missing stages
+18. **CI improvements** — add missing stages
 
-### Priority 5: ARCHITECTURE (long-term)
-13. **Code duplication** — extract to shared modules
-14. **Project context file** — create or improve
+### Priority 6: ARCHITECTURE (long-term)
+19. **Code duplication** — extract to shared modules
+20. **Project context file** — create or improve
 
 ## How to Apply Each Fix
 

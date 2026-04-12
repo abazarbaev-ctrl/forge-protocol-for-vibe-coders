@@ -96,14 +96,66 @@ Use Agent tool to run multiple checks in parallel where possible. Read actual co
 - Check what it actually does: just build? lint? test? security scan?
 - Grade: `None` / `Build only` / `Build + test` / `Build + test + security scan`
 
-### Category 5: ARCHITECTURE
+### Category 5: LLM EFFICIENCY (for projects that call LLMs)
 
-**5.1 Code Duplication**
+Skip this category if the project doesn't make LLM/AI API calls. If it does, this is a deep analysis.
+
+**5.1 Find All LLM Calls**
+- Grep for SDK imports: `anthropic`, `openai`, `google.generativeai`, `cohere`, `together`
+- Grep for API endpoints: `api.anthropic.com`, `api.openai.com`, `generativelanguage.googleapis.com`
+- Grep for common wrappers: `langchain`, `litellm`, `instructor`, `llamaindex`
+- For each call found, READ the surrounding code to understand: what it sends, what model, what it does with the response
+- Result: list of LLM calls with file:line, model used, and purpose
+
+**5.2 Cost Controls**
+- Does each LLM call have a `max_tokens` / `max_completion_tokens` limit?
+- Is there a per-request or per-user cost cap? (middleware, rate limit, or manual check)
+- Is there any cost tracking/logging? (token counts logged, cost per call calculated)
+- Are token counts visible anywhere? (dashboard, logs, alerts)
+- Grade: `None` / `Partial (limits but no tracking)` / `Full (limits + tracking + alerts)`
+
+**5.3 Reliability**
+- Does each LLM call have a timeout? (httpx timeout, client timeout, asyncio.wait_for)
+- Is there retry with backoff? (tenacity, exponential backoff, manual retry)
+- Is there a fallback? (try model A, fall back to model B)
+- Are responses validated before use? (check for empty, check for expected format, Pydantic parse)
+- Are LLM calls fire-and-forget with no error handling? Count them.
+- Grade: `None` / `Basic (timeouts only)` / `Resilient (timeout + retry + validation)` / `Production (+ fallback + error handling)`
+
+**5.4 Prompt Efficiency**
+- READ each prompt/system message — is it bloated? (repeating instructions, sending full context when summary would work)
+- Is prompt caching used? (Anthropic cache_control, OpenAI cached prompts)
+- Are there hardcoded few-shot examples that could be a fine-tuned model or lookup?
+- Is the model tier appropriate? (using Opus/GPT-4 for simple extraction/classification that Haiku/GPT-4o-mini handles)
+- Grade: `Wasteful` / `Reasonable` / `Optimized (right model + caching + lean prompts)`
+
+**5.5 Migration Candidates — Deterministic Replacement Analysis**
+This is the most valuable check. For EACH LLM call, assess:
+- **Is the output predictable?** If 90%+ of outputs follow the same pattern, it's a rules engine, not an LLM task.
+  - Classification into fixed categories → lookup table / if-else / regex
+  - Extracting structured data from structured input → parsing
+  - Formatting/templating → string templates
+  - Simple Q&A from known data → database query
+- **Is the LLM doing work the database could do?** Filtering, sorting, matching on known fields.
+- **Is the LLM a glorified if-else?** Decision trees with <10 branches don't need AI.
+- Flag each LLM call as: `Keep (genuinely needs LLM)` / `Candidate (could be deterministic)` / `Obvious (should definitely be deterministic)`
+- For each candidate/obvious, note what the deterministic replacement would be
+- Grade: `No LLM calls` / `All necessary` / `X of Y calls are migration candidates` / `X of Y calls are obvious replacements`
+
+**5.6 Process Leaks**
+- Are there background LLM tasks (async, threads, workers) that could hang?
+- Is there a timeout on background AI processing?
+- Could a stuck LLM call hold a database connection or lock?
+- Grade: `No background LLM` / `Background with safeguards` / `Background without safeguards`
+
+### Category 6: ARCHITECTURE
+
+**6.1 Code Duplication**
 - Use Agent to check: are there functions/classes that do the same thing in multiple files?
 - Look for copy-pasted error handling, repeated API calls, duplicate validation logic
 - Grade: `Low` / `Moderate (examples found)` / `High (systematic duplication)`
 
-**5.2 Project Context File**
+**6.2 Project Context File**
 - Check for CLAUDE.md, .cursorrules, or .github/copilot-instructions.md
 - If exists, READ it — does it have architecture decisions, module boundaries, quality score?
 - Grade: `None` / `Exists but shallow` / `Comprehensive`
@@ -147,6 +199,17 @@ TESTING
   Tests:                34 tests (happy path + some edges)  ⚠
   CI pipeline:          Build + test + security scan        ✓
 
+LLM EFFICIENCY (if applicable)
+  LLM calls found:     8 calls across 4 files               —
+  Cost controls:        max_tokens set, no tracking          ⚠
+  Reliability:          Timeouts on 5/8, no retry            ⚠
+  Prompt efficiency:    Opus used for classification         ⚠
+  Migration candidates: 3/8 calls could be deterministic    ⚠
+    → classify_urgency(): regex/rules would cover 95%
+    → extract_fields(): structured input, use parsing
+    → format_response(): string template
+  Process leaks:        1 background task without timeout    ⚠
+
 ARCHITECTURE
   Code duplication:     Low                                 ✓
   Project context file: Comprehensive CLAUDE.md             ✓
@@ -158,8 +221,10 @@ Fix plan (priority order):
 1. [SECURITY] Add auth to 6 unprotected routes
 2. [SECURITY] Add input validation to 4 POST endpoints
 3. [ERROR] Upgrade health check to verify DB/Redis
-4. [TEST] Add adversarial tests for auth bypass, injection
-5. [DEPS] Update 2 vulnerable dependencies
+4. [LLM] Add cost tracking + timeouts to 3 unprotected calls
+5. [LLM] Migrate classify_urgency() to rules engine
+6. [TEST] Add adversarial tests for auth bypass, injection
+7. [DEPS] Update 2 vulnerable dependencies
 
 Run /forge-fix to execute this plan.
 ```
