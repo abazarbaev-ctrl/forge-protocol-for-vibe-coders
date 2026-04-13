@@ -150,12 +150,6 @@ Then `/forge-fix` applies fixes one by one — each a single commit, highest pri
 
 Plus **automatic behavior**: Claude Code applies quality gates when you build, reviews its own code, writes adversarial tests, and nudges you before deploys. You don't invoke gates — they run around you.
 
-**Quality badge for your README:**
-
-![Forge Quality 5/5](https://img.shields.io/badge/forge_quality-5%2F5-brightgreen) ![Forge Quality 3/5](https://img.shields.io/badge/forge_quality-3%2F5-yellow) ![Forge Quality 1/5](https://img.shields.io/badge/forge_quality-1%2F5-red)
-
-`/forge-scan` generates the badge for your current score.
-
 ### Any other AI coding tool (manual)
 
 1. Read [`FORGE_PROTOCOL.md`](FORGE_PROTOCOL.md) — takes 15 minutes
