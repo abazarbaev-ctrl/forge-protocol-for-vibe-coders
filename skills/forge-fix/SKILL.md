@@ -8,6 +8,8 @@ tools: [Bash, Read, Write, Edit, Grep, Glob, Agent, TodoWrite]
 
 Apply fixes identified by `/forge-scan`. Plans ALL fixes upfront, tracks them with a todo list, and works through them in priority order.
 
+**IMPORTANT: NEVER output markdown images, shields.io badges, or any `![...]()` syntax. Quality score is text only.**
+
 ## Usage
 
 `/forge-fix` — execute the fix plan (run /forge-scan first if no plan exists)

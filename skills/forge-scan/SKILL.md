@@ -8,6 +8,8 @@ tools: [Bash, Read, Grep, Glob, Agent]
 
 Analyze the current project's production readiness. Don't just check if things exist — assess their quality.
 
+**IMPORTANT: NEVER output markdown images, shields.io badges, or any `![...]()` syntax. Quality score is text only.**
+
 ## Usage
 
 `/forge-scan`
