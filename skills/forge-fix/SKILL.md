@@ -160,6 +160,18 @@ Quality score: 3/5 → 4/5 (projected after remaining fixes)
 Continue? (y/n)
 ```
 
+## Dependency Rules
+
+These prevent the most common CI failures after forge-fix commits:
+
+1. **When adding a new package:** verify the import works with the PINNED version, not whatever is installed locally. Run: `pip install package==<pinned_version> && python -c "import ..."` or equivalent. Local machine may have a different major version with a different API.
+
+2. **When adding a linter to CI:** run it locally against the FULL codebase before committing the CI config. Fix all errors first, in the same commit. Don't push a linter that will immediately fail.
+
+3. **When making pip-audit/npm-audit hard fail:** run the audit locally first. If there are CVEs, fix them in the same commit that enables hard fail. Don't enable hard fail and leave known vulnerabilities to break the next build.
+
+4. **When pinning version ranges (>=X,<Y):** check that the import API is stable across the entire range. Major versions often break APIs. If the code uses v3+ API, don't allow v2 in the pin.
+
 ## Rules
 
 - **Always ask before auth decisions** — don't guess what should be public vs protected
