@@ -136,6 +136,18 @@ Always fix in this order:
 
 ## How to Apply Each Fix
 
+**State the success criteria first.** Before applying a fix, write down the test that will prove it's fixed:
+- "This fix is done when: test `test_X` passes (currently fails)"
+- For non-testable fixes (docs, config, infra): state the observable check ("fix is done when `curl /health` returns 200 and includes DB status")
+- If you can't state a criterion, the fix is probably not well-defined — pause and clarify
+
+**Test-first for bug fixes.** For any SECURITY, ERROR, or bug-class fix:
+1. Write the regression test first
+2. Run it — confirm it fails for the right reason
+3. Apply the fix
+4. Re-run — confirm it passes
+5. Commit both together
+
 **Read before writing.** Don't just drop templates in. Understand the existing code:
 - What framework? What patterns does the codebase already use?
 - What dependencies are already installed?
